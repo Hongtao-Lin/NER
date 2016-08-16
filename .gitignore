@@ -1,0 +1,8 @@
+*.tar.gz
+*.model
+*.txt
+*.out
+*.save
+env/
+ontonotes-release-5.0/
+*.pyc
