@@ -6,3 +6,4 @@
 env/
 ontonotes-release-5.0/
 *.pyc
+CRF/CRF++-0.58
