@@ -7,3 +7,8 @@ env/
 ontonotes-release-5.0/
 *.pyc
 CRF/CRF++-0.58
+*.swp
+CRF/bin
+CRF/include
+CRF/lib
+model/

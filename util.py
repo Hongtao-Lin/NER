@@ -1,6 +1,7 @@
 # coding:utf-8
 import re, os, sys, time, codecs
 import collections, copy, cPickle, operator
+import math, string
 
 train_file = "data/MSRA/train.txt"
 output_train_file = "data/MSRA/train.out"
@@ -18,6 +19,19 @@ org_save = "dict/org_surf.save"
 surname_list = {"single": [], "double": []}
 place_list = []
 org_list = []
+
+num_list = string.digits + u"一二三四五六七八九十两零几多"
+punct_list = string.punctuation + "be" + u"。”’、—"
+sw_list = u"些仅不个乎也了仍们你我他她但借假再几别既即却又另只的"\
+	u"叫各吓吗嘛否吧吱呀呃哦呗呢呵呜呸咋咦咧咱咳哇哈哎哒哟哦噢哪哼唉啥啦啪"\
+	u"喂喏喔喽嗡嗬嗯嗳嘎嘘嘻嘿里是还到"\
+	u"它就很得怎么打把某死每没而虽被谁说贼这俄"
+org_sw = u"些仅不个乎也了仍们你我他她但再几别既即却又另只的"\
+	u"叫各吓吗嘛否吧吱呀呃哦呗呢呵呜呸咋咦咧咱咳哇哈哎哒哟哦噢哪哼唉啥啦啪"\
+	u"喂喏喔喽嗡嗬嗯嗳嘎嘘嘻嘿里是还到"\
+	u"它很得怎么把某每没而虽被谁说贼这"
+org_sw += punct_list
+name_sw = sw_list + u"说摄地会使委市" + u"\u1111\u1112\u1113"
 
 # convert full-mode into half mode
 def strQ2B(ustring):
@@ -199,7 +213,7 @@ def read_output(fname, rname):
 
 # given texts with format: xxx/nr xx...
 # output as format: x 	0	b_nr
-def read_write(fname, oname, isTest=False):
+def read_write(fname, oname, isTest=False, extract_ne=None):
 	f = open(fname, "r")
 	out = open(oname, "w")
 	cnt = 0
@@ -212,6 +226,8 @@ def read_write(fname, oname, isTest=False):
 			continue
 		if not isTest:
 			for seg in line.strip().decode("utf8").split():
+				if seg[0] == u"\ufeff":
+					seg = seg[1:]
 				sList = seg.split("/")
 				i = 0
 				sent += strQ2B(sList[0])
@@ -227,18 +243,26 @@ def read_write(fname, oname, isTest=False):
 						ne_type = "i_"+sList[1]
 					ne_list.append(ne_type)
 			feat_list = compile_features(sent)
-			# pred_list = extract_ne(sent)
+			if extract_ne:
+				pred_list = extract_ne(sent)
 			for i in range(len(ne_list)):
-				# info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + pred_list[i] + "\t" + ne_list[i]
-				info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i]
+				# if extract_ne:
+				# 	info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + pred_list[i] + "\t" + ne_list[i]
+				# else:
+				# 	info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i]
+				info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i] + "\t" + pred_list[i] 
 				# info = sent[i] + "\t" + ne_list[i]
 				out.write(info.encode("utf8") + "\n")
 		else:
 			sent = line.strip().decode("utf8")
 			feat_list = compile_features(sent)
-			pred_list = extract_ne(sent)
+			if extract_ne:
+				pred_list = extract_ne(sent)
 			for i in range(len(ne_list)):
-				info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + pred_list[i]
+				if extract_ne:
+					info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + pred_list[i] + "\t" + ne_list[i]
+				else:
+					info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i]
 				out.write(info.encode("utf8") + "\n")
 		out.write("\n")
 	f.close()
@@ -268,6 +292,57 @@ def load_suf_from_file(fname, sname):
 		cPickle.dump(temp_list, open(sname, "w"))
 	return temp_list
 
+
+def is_valid(c, d=[]):
+	flag = (c >= u"\u4e00" and c <= u"\u9fa5")
+	flag = flag and (c not in org_sw+num_list)
+	if d != []:
+		flag = flag and (c in d)
+	return flag
+
+def get_pmi(fname, dname, k):
+	f = open(fname, "r")
+	sur = {}
+	pre = {}
+	with open(dname, "r") as f1:
+		for l in f1.readlines():
+			l = l.strip().decode("utf8").split()
+			if not l:
+				continue
+			l = l[0]
+			pre[l[0]] = pre.get(l[0], 0) + 1
+			sur[l[-1]] = sur.get(l[-1], 0) + 1
+	sur = sorted(i for i in sur if i >= 5)
+	pre = sorted(i for i in pre if i >= 5)
+	bi = {}
+	uni = {}
+	pmi = {}
+	for line in f.xreadlines():
+		# preprocess
+		line = strQ2B(line.decode("utf8").strip())
+		for i in range(len(line[:])):
+			if is_valid(line[i]):
+				uni[line[i]] = uni.get(line[i], 0) + 1
+			if i < len(line)-1 and is_valid(line[i]) and is_valid(line[i+1]):
+				bi[line[i:i+2]] = bi.get(line[i:i+2], 0) + 1
+	f.close()
+	temp = sum(bi.values())
+	for b in bi:
+		bi[b] /= float(temp)
+	temp = sum(uni.values())
+	for u in uni:
+		uni[u] /= float(temp)
+	print len(bi)
+	for b in bi:
+		if uni[b[0]] == 0 or uni[b[1]] == 0 or (b[0] not in sur and b[1] not in pre):
+			continue
+		pmi[b] = math.log( bi[b]**k / (uni[b[0]]*uni[b[1]]) )
+	pmi = sorted(pmi.items(), key=operator.itemgetter(1), reverse=True)[:5000]
+	o = open("pmi_res2.out", "w")
+	for p, v in pmi:
+		o.write(p.encode("utf8") + "\t" + str(v) + "\n")
+	o.close()
+
 def init():
 	global surname_list, place_list, org_list
 
@@ -294,9 +369,9 @@ init()
 
 def main():
 	# read_write(train_file, output_train_file)
-	read_write(test_file, output_test_file)
+	# read_write(test_file, output_test_file)
 	# true_y, pred_y = read_output(test_output_file, testright_file)
-	return
+	get_pmi("./data/pmi_text.txt", "./dict/all.txt", 10)
 
 if __name__ == '__main__':
 	main()
