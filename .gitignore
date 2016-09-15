@@ -12,11 +12,8 @@ CRF/CRF++-0.58
 CRF/bin
 CRF/include
 CRF/lib
-demo/env/
 demo/app/static/js/node_modules/
 demo/app/CRF++-0.58/
 demo/app/crfsuite-0.12/
 demo/app/src/ltp_data/
-demo/app/src/data/*.save
-demo/app/src/*.model
 
