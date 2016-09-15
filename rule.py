@@ -3,7 +3,7 @@ import re, os
 import dawg # C++ based Trie-tree implementation
 import time
 import collections, copy, cPickle, operator, string
-from util import read_write, strQ2B
+from util import read_write, strQ2B, get_ne_type
 
 __dir__ = "./dict/"
 
@@ -67,20 +67,27 @@ out_file1 = "./testright_new1.out"
 out_file2 = "./testright_new21.out"
 out_file3 = "./testright_new31.out"
 
+# match the sentence with the compiled rules AND causal rules I wrote directly.
+# input: sent; i: start idx; e: end_idx; t: (int) type of NE to match.
+# sent[i:e] is the possible NE we find. here we also consider the *context*(-2, +2) of the NE.
+# output: bool.
 def match_rule(sent, i, e, t):
+	# if the possible NE is embedded in a unclosed punct.
 	if sent[i-1:i+1] in exclude_list or sent[i+e-1:i+e+1] in exclude_list:
 		return False
-
 	if (sent[i-1] in u"\"'“‘<[(《" or sent[i+e] in u"\"'”’>)]》") and sent[i-1]+sent[i+e] not in punct_pairs:
 		return False
 	if sent[i-1] in u"-—·)》" or sent[i+e] in u"-—·(《":
 		return False
+
+	# replace the possible NE/punct/number with a symbol.
 	test_ne = sent[i-2:i] + ne_char[ne_list_rev[t]] + sent[i+e:i+e+2]
 	for w in test_ne:
 		if w in num_list:
 			test_ne = test_ne.replace(w, "N")
 		if w in punct_list:
 			test_ne = test_ne.replace(w, "P")
+
 	pre = group_dict.get(test_ne[:2], test_ne[:2])
 	suf = group_dict.get(test_ne[3:], test_ne[3:])
 	if len(pre) > 1:
@@ -90,8 +97,14 @@ def match_rule(sent, i, e, t):
 	test_ne = pre + ne_char[ne_list_rev[t]] + suf
 	if debug and t == 1:
 		print test_ne
+
+	# using regex to match it.
 	return rule.match(test_ne)
 
+# core function of matching in sentence.
+# this function receives a sentence, and extract possible PER, LOC and ORGs within it. 
+# returns a dict, the key is start_idx, value is a tuple: (end_idx, ne_type).
+# note that the idx refer to the original sentence.  
 def rough_match(sent):
 	if debug:
 		print sent
@@ -100,7 +113,7 @@ def rough_match(sent):
 	new_inc = []
 	_sent = sent
 
-	# get Custom NEs.
+	# get NEs from dict.
 	i, j, k = 2, 2, 2
 	while True:
 		if i == len(sent)-2:
@@ -137,94 +150,13 @@ def rough_match(sent):
 		i += step
 		k += 1
 		new_inc.append(step)
-
-	# # get ORGs
-	# i, j, k = 2, 2, 2
-	# # print "ORG begin"
-	# while True:
-	# 	if i == len(sent)-2:
-	# 		break
-	# 	step = prev_inc[k]
-	# 	prefixes = org_trie.prefixes(_sent[j:-2])
-	# 	if prefixes:
-	# 		e = len(prefixes[-1])
-	# 		ne_map[i] = [e, 2]
-	# 		_sent = _sent[:j] + u"\u1113" + _sent[j+e:]
-	# 		step += e-1
-	# 		k += e-1
-	# 	j += 1
-	# 	i += step
-	# 	k += 1
-	# 	new_inc.append(step)
-
-	# # get LOCs
-	# prev_inc = [1, 1] + new_inc + [1, 1]
-	# new_inc = []
-	# i, j, k = 2, 2, 2
-	# while True:
-	# 	if i == len(sent)-2:
-	# 		break
-	# 	step = prev_inc[k]
-	# 	prefixes = place_trie.prefixes(_sent[j:-2])
-	# 	if prefixes:
-	# 		e = len(prefixes[-1])
-	# 		if match_rule(_sent, j, e, 1):
-	# 			ne_map[i] = [e, 1]
-	# 			_sent = _sent[:j] + u"\u1112" + _sent[j+e:]
-	# 			step += e-1
-	# 			k += e-1
-	# 	k += 1
-	# 	i += step
-	# 	j += 1
-	# 	new_inc.append(step)
-
-	# # get PERs:
-	# prev_inc = [1, 1] + new_inc + [1, 1]
-	# new_inc = []
-	# i, j, k = 2, 2, 2
-	# date_list = u"年月日号"
-	# name_sw = sw_list + u"说摄地会使委市" + u"\u1111\u1112\u1113"
-	# forbid_name = string.ascii_letters + string.digits + punct_list + name_sw
-	# # print "PER begin"
-
-	# while True:
-	# 	# print i, k, j
-	# 	if i == len(sent)-2:
-	# 		break
-	# 	step = prev_inc[k]
-	# 	prefixes = person_trie.prefixes(_sent[j:-2])
-	# 	if prefixes:
-	# 		e = len(prefixes[-1])
-	# 		if match_rule(_sent, j, e, 0):
-	# 			ne_map[i] = [e, 0]
-	# 			_sent = _sent[:j] + u"\u1111" + _sent[j+e:]
-	# 			step += e-1
-	# 			k += e-1
-	# 	# if _sent[j] in surname_list["single"]:
-	# 	# 	if _sent[j+1] not in forbid_name:
-	# 	# 		if _sent[j+2] not in forbid_name and match_rule(_sent, j, 3, 0):
-	# 	# 			ne_map[i] = [3, 0]
-	# 	# 			_sent = _sent[:j] + u"\u1111" + _sent[j+3:]
-	# 	# 			step += 3-1
-	# 	# 			k += 3-1
-	# 	# 		elif match_rule(_sent, j, 2, 0):
-	# 	# 			ne_map[i] = [2, 0]
-	# 	# 			_sent = _sent[:j] + u"\u1111" + _sent[j+2:]
-	# 	# 			step += 2-1
-	# 	# 			k += 2-1
-	# 	k += 1
-	# 	j += 1
-	# 	i += step
-	# 	new_inc.append(step)
 	
 	if debug:
 		print _sent
-	# get other ORGs
+	# get other ORGs: from possible integration.
 	prev_inc = [1, 1] + new_inc + [1, 1]
 	new_inc = []
-	i = 2
-	j = 2
-	k = 2
+	i, j, k = 2, 2, 2
 	# print prev_inc
 	while True:
 		if debug:
@@ -261,7 +193,12 @@ def rough_match(sent):
 
 	return ne_map
 
-# convert = True if the original sentence is substituted by new one.
+# input: original sentence. 
+# output: 
+# if convert=False: return a list of denotation. 
+# (eg: "I am Hunter" -> ["o", "o", "o", "b_ns", "i_ns", ..., "e_ns"])
+# if convert=True: return a new sentence (symbolize) and the ne_map.
+# (eg: "I am Hunter" -> "I am \u1111", {5: (11, 0)} (5: "H", 11： "r", 0: type of PER.)
 def extract_ne(_sent, convert=False):
 	global ne_list, trie
 	cur_idx = 0
@@ -278,15 +215,9 @@ def extract_ne(_sent, convert=False):
 		pred_list = ["o"] * (len(sent)-4)
 		for i, (e, t) in ne_map.items():
 			ne_type = ne_list_rev2[t]
+			l = i+e-1
 			for j in range(i,i+e):
-				ne_suf = ""
-				if j == i:
-					ne_suf = "b_"
-				elif j == i+e-1:
-					ne_suf = "e_"
-				else:
-					ne_suf = "i_"
-				pred_list[j-2] = ne_suf+ne_type
+				pred_list[j-2] = get_ne_type(j, l, ne_type)
 		# print pred_list
 		return pred_list
 	else:
@@ -299,8 +230,7 @@ def extract_ne(_sent, convert=False):
 			new_sent += _sent[_i:i] + ne_char[ne_list_rev[t]]
 			_i = i+e
 			new_map[len(new_sent)-1] = sent[i:_i].encode("utf8")
-		new_sent += _sent[_i:]
-		new_sent = new_sent[:-2]
+		new_sent += _sent[_i:-2]
 
 		# for i in new_map:
 		# 	print i, new_map[i]
@@ -330,6 +260,7 @@ def load_list_from_file(fname, sname):
 		cPickle.dump(temp_list, open(sname, "w"))
 	return temp_list
 
+# just a utility function for loading NEs.
 def get_ne(fname, ne_type, ne_list = None):
 	if ne_list == None:
 		ne_list = {}
@@ -379,31 +310,38 @@ def init():
 	org_list = load_list_from_file(org_file, org_save)
 	exclude_list = load_list_from_file(exclude_file, exclude_save)
 
+# Here hides the mysteries of rules I find (with little theoratical groundings...)
+# Also, it compiles the rules for integrating a larger ORG.
 def compile_rules():
 	global rule, group_dict, org_rule
-	# r = open(rule_file, "r")
-	# for line in r.readlines():
-	# 	rule_list.append(line.strip().decode("utf8"))
-	# r.close()
+	# list of groups with similar words in their meaning/functionality.
+	# Note that currently I do not allow *DUPLICATED* words in groups, which I know is quite buggy..
 	group = [
-		u"A: 宣布 表示 认为 指出 报道 说到 说道 强调 要求 介绍 告诉 还说 感谢 会见 发言 "\
+		# A: inform/announce/say
+		u"A:  宣布 表示 认为 指出 报道 说到 说道 强调 要求 介绍 告诉 还说 感谢 会见 发言 "\
 			u"举行 召开 进行 访问 开幕 互访 交流 举办 正式 设立 建立 确立 投资 实施 实行 ",
-		u"B: 代表 秘书 院士 院长 同志 教练 先生 女士 习生 讯员 言人 主任 常委 副委 董事 校长 军官 "\
-			u"委员 员长 副部 部长 主席 记者 经理 会长 行长 局长 省长 市长 县长 首相 总裁 总统 总理 "\
-			u"大使 事长 导员 选手 所长"\
-			u"总书 司机 教授 学生 作者 "\
+		# B: person titles
+		u"B:  代表 秘书 院士 院长 同志 教练 先生 女士 习生 讯员 言人 主任 常委 副委 董事 校长 军官 "\
+		    u"委员 员长 副部 部长 主席 记者 经理 会长 行长 局长 省长 市长 县长 首相 总裁 总统 总理 "\
+			u"大使 事长 导员 选手 所长 总书 司机 教授 学生 作者 "\
 			u"下士 中士 上士 准尉 少尉 中尉 上尉 大尉 准校 少校 中校 上校 大校 准将 少将 中将 上将 ",
-		u"C: 以及 和 还有 与 由 陪同 等 其中 是 同 ",
-		u"D: 当年 去年 今年 明年 近日 日前 今日 今天 昨日 昨天 明天 后天 N日 N月 N日 N号",
-		u"E: 想起 想到 发现 欢迎 迎接",
-		u"F: 包括 了 有 ",
-		u"G: 地处 抵达 撤出 离开 逃离 撤回 返回 ", # mostly surfix
-		u"H: 在 从 到 驻 来 去 回 向 对 为 于 沿 离 至 到达 前往 回到 到了 来到 ", # only used as prefix
-		u"I: 首都 省会 景点 城市 小镇 ",
-		u"J: 景区 县城 城区 市区 区域 境内 政府 地区 国家 国际 郊外",
-		u"K: 东 西 南 北 上 下 左 右 ",
-		u"L: "\
-			u"制裁 畅销 提供 入侵 派遣",
+		# C: connectives
+		u"C:  以及 和 还有 与 由 陪同 等 其中 是 同 ",
+		# D: time-related
+		u"D:  当年 去年 今年 明年 近日 日前 今日 今天 昨日 昨天 明天 后天 N日 N月 N日 N号",
+		# E: used as pre-words in person
+		u"E:  想起 想到 发现 欢迎 迎接",
+		# F: ..
+		u"F:  说 摄",
+		# G: indicating places, mostly surfix
+		u"G:  地处 抵达 撤出 离开 逃离 撤回 返回 ", 
+		# H: indicating places, only used as prefix
+		u"H:  在 从 到 驻 来 去 回 向 对 为 于 沿 离 至 到达 前往 回到 到了 来到 ", 
+		# I: title of places
+		u"I:  首都 省会 景点 城市 小镇 ",
+		u"J:  景区 县城 城区 市区 区域 境内 政府 地区 国家 国际 郊外",
+		u"K:  东 西 南 北 上 下 左 右 ",
+		u"L:  制裁 畅销 提供 入侵 派遣"
 		# u"X: \u1111",
 		# u"Y: \u1112",
 		# u"Z: \u1113"
@@ -414,13 +352,11 @@ def compile_rules():
 			group_dict[d] = group_dict.get(d, "") + tag
 	rule_list = []
 	# for person
-	rule_list = [u".Pᄑ[ADBH说摄].?",]
-	rule_list += [u"Bᄑ[ACD说摄H].?",u"EᄑB",u"[BD]ᄑP.",]
+	rule_list = [u".Pᄑ[ADBHF].?",]
+	rule_list += [u"Bᄑ[ACDFH].?",u"EᄑB",u"[BD]ᄑP.",]
 	rule_list += [u".了ᄑ的P.?",u".?[C]ᄑ[AB]"]
 	rule_list += [u"ᄑCᄑ..?"]
 	rule_list += [u".?.ᄑ..?"]
-
-	# rule_list += [u".Pᄑ[ADBH说摄]",u"[BD]ᄑP.",u"ᄑPᄑ..",]
 
 	# for location
 	# rule_list += [u".?[DHGIP]ᄒ[JKLD].?"]
@@ -436,7 +372,6 @@ def compile_rules():
 	org_rule = []
 
 	# rules in org_list must have a subpart to match!
-
 	for o in org_list:
 		# org_rule.append(u"(ᄒ*[ᄑᄓ])+[^"+org_sw+"]{0,4}"+o)
 		org_rule.append(u"[ᄒᄑᄓ]+[^"+org_sw+"]{0,4}"+o)
@@ -518,6 +453,7 @@ def get_all_org_kw(fname):
 	o.close()
 	f.close()
 
+# following three are utility functions to clean words in dicts.
 def clean_org_surf(fname):
 	f = open(fname, "r")
 	o = open("test_suf2.out", "w")
@@ -585,6 +521,7 @@ def clean_org(fname):
 init()
 compile_rules()
 
+# write your test cases here to see results and debug info.
 def test_case():
 	global debug
 	debug = True	

@@ -2,6 +2,13 @@
 import os, re
 from util import strQ2B
 
+# Preprocess the data in the original ontonotes5.0, specifically, we:
+# 1. remove the irrelavant string in ontonotes.
+# 2. leave out only three types of NE: PER, ORG, LOC.
+# 3. convert full-mode(全角) to half-mode(半角)
+
+
+
 tagDict = {"GPE":"/ns","ORG":"/nt","PERSON":"/nr"}
 
 __dir__ = "ontonotes-release-5.0/data/files/data/chinese/annotations/"
@@ -26,8 +33,6 @@ def extract_ne_from_onto(fname, o):
 		if sent == "</DOC>":
 			continue
 		sent = strQ2B(sent)
-		# print sent
-		# sent = sent.replace("<ENAMEX ", "<ENAMEX").replace(" E_OFF", "E_OFF").replace(" S_OFF", "S_OFF")
 		sent = re.sub(r"<( /)?/? ([^<]+) >", replace_exclude, sent)
 		sent = re.sub(r"<ENAMEX ([^<]+)</ENAMEX>", replace_include, sent)
 		# print sent
@@ -46,7 +51,6 @@ def extract_ne_from_onto(fname, o):
 				sList.append(s+"/o")
 			else:
 				a = 1
-				# print s
 				print line
 				for p in sent:
 					print p
@@ -54,11 +58,8 @@ def extract_ne_from_onto(fname, o):
 				# print fname
 			i += 1
 		sent_write = " ".join(sList)
-		# print "out:", sent_write
-		# print sent_write
 		o.write(sent_write.encode("utf8") + "\n")
 	f.close()
-
 
 def ontonotes_ne():
 	for c in corp:
@@ -70,7 +71,6 @@ def ontonotes_ne():
 				if file[-5:] == ".name":
 					extract_ne_from_onto(root+'/'+file, f)
 		f.close()
-
 
 if __name__ == '__main__':
 	ontonotes_ne()

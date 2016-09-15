@@ -3,12 +3,20 @@ import re, os, sys, time, codecs
 import collections, copy, cPickle, operator
 import math, string
 
+# This file provides several utility functions for further use.
+
+# file path for converting the original train/test file 
+# to format of CRF++
 train_file = "data/MSRA/train.txt"
 output_train_file = "data/MSRA/train.out"
 test_file = "data/MSRA/testright.txt"
 output_test_file = "data/MSRA/testright.out"
+
+# input file for further analysis and ground-truth file.
 test_output_file = "data/MSRA/testoutput_char_e_85.out"
 testright_file = "dict/testright.txt"
+
+# resource files: surname, place and org.
 surname_file = "dict/surname.txt"
 surname_save = "dict/surname.save"
 place_file = "dict/place_surf.txt"
@@ -20,6 +28,7 @@ surname_list = {"single": [], "double": []}
 place_list = []
 org_list = []
 
+# predefined list...
 num_list = string.digits + u"一二三四五六七八九十两零几多"
 punct_list = string.punctuation + "be" + u"。”’、—"
 sw_list = u"些仅不个乎也了仍们你我他她但借假再几别既即却又另只的"\
@@ -31,9 +40,10 @@ org_sw = u"些仅不个乎也了仍们你我他她但再几别既即却又另只
 	u"喂喏喔喽嗡嗬嗯嗳嘎嘘嘻嘿里是还到"\
 	u"它很得怎么把某每没而虽被谁说贼这"
 org_sw += punct_list
+# note that \u1111, 1112, 1113 are PER, LOC, ORG, respectively.
 name_sw = sw_list + u"说摄地会使委市" + u"\u1111\u1112\u1113"
 
-# convert full-mode into half mode
+# convert full-mode into half-mode
 def strQ2B(ustring):
 	"""全角转半角"""
 	rstring = ""
@@ -48,6 +58,19 @@ def strQ2B(ustring):
 			inside_code -= 65248
 		rstring += unichr(inside_code)
 	return rstring
+
+# currently BIEO repr.
+# e.g.: Apple/ns -> A: b_ns, p: i_ns, e: e_ns
+# input: i: idx of char, l: length of word, t: type of word.
+def get_ne_type(i, l, t):
+	if t == "o":
+		return "o"
+	if i == 0:
+		return "b_"+t
+	elif i == l-1:
+		return "e_"+t
+	else:
+		return "i_"+sList[1]
 
 def compile_surname(sent, feat_list):
 	global surname_list
@@ -108,6 +131,8 @@ def compile_org(sent, feat_list):
 			i += 2
 		i += 1
 
+# input: original sentence.
+# output: a list containing the features extracted. (like is_surname, is_place)
 def compile_features(sent):
 	feat_list = []
 	for i in range(len(sent)):
@@ -115,7 +140,6 @@ def compile_features(sent):
 	compile_surname(sent, feat_list)
 	compile_place(sent, feat_list)
 	compile_org(sent, feat_list)
-
 	return feat_list
 
 def read_output(fname, rname):
@@ -213,6 +237,10 @@ def read_output(fname, rname):
 
 # given texts with format: xxx/nr xx...
 # output as format: x 	0	b_nr
+# which is the format for CRF.
+# isTest: provide a different precessing method for test file (no ground truth)
+# extract_ne: a function var, we use it to extract pre-defined ne from rules
+# , and use it as a refernce feature in CRF++. Example: see rule.py
 def read_write(fname, oname, isTest=False, extract_ne=None):
 	f = open(fname, "r")
 	out = open(oname, "w")
@@ -224,8 +252,9 @@ def read_write(fname, oname, isTest=False, extract_ne=None):
 		sent = ""
 		if line.strip() == "":
 			continue
+		line = strQ2B(line.strip().decode("utf8"))
 		if not isTest:
-			for seg in line.strip().decode("utf8").split():
+			for seg in line.split():
 				if seg[0] == u"\ufeff":
 					seg = seg[1:]
 				sList = seg.split("/")
@@ -233,41 +262,34 @@ def read_write(fname, oname, isTest=False, extract_ne=None):
 				sent += strQ2B(sList[0])
 				l = len(sList[0])
 				for i in range(l):
-					if sList[1] == "o":
-						ne_type = "o"
-					elif i == 0:
-						ne_type = "b_"+sList[1]
-					elif i == l-1:
-						ne_type = "e_"+sList[1]
-					else:
-						ne_type = "i_"+sList[1]
+					ne_type = get_ne_type(i, l, sList[1])
 					ne_list.append(ne_type)
 			feat_list = compile_features(sent)
 			if extract_ne:
 				pred_list = extract_ne(sent)
 			for i in range(len(ne_list)):
-				# if extract_ne:
-				# 	info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + pred_list[i] + "\t" + ne_list[i]
-				# else:
-				# 	info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i]
-				info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i] + "\t" + pred_list[i] 
-				# info = sent[i] + "\t" + ne_list[i]
+				tmp_list = [sent[i]] + feat_list[i]
+				if extract_ne:
+					tmp_list.append(pred_list[i])
+				tmp_list.append(ne_list[i])
+				info = "\t".join(tmp_list)
 				out.write(info.encode("utf8") + "\n")
 		else:
-			sent = line.strip().decode("utf8")
+			sent = line
 			feat_list = compile_features(sent)
 			if extract_ne:
 				pred_list = extract_ne(sent)
-			for i in range(len(ne_list)):
+			for i in range(len(sent)):
+				tmp_list = [sent[i]] + feat_list[i]
 				if extract_ne:
-					info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + pred_list[i] + "\t" + ne_list[i]
-				else:
-					info = sent[i] + "\t" + "\t".join(feat_list[i]) + "\t" + ne_list[i]
+					tmp_list.append(pred_list[i])
+				info = "\t".join(tmp_list)
 				out.write(info.encode("utf8") + "\n")
 		out.write("\n")
 	f.close()
 	out.close()
 
+# utility function to load NEs from dicts.
 def load_ne_from_file(fname, sname, tag):
 	if os.path.exists(sname):
 		temp_trie = cPickle.load(open(sname, "r"))
@@ -292,7 +314,7 @@ def load_suf_from_file(fname, sname):
 		cPickle.dump(temp_list, open(sname, "w"))
 	return temp_list
 
-
+# whether a character is valid to consist a possible NE. 
 def is_valid(c, d=[]):
 	flag = (c >= u"\u4e00" and c <= u"\u9fa5")
 	flag = flag and (c not in org_sw+num_list)
@@ -300,6 +322,7 @@ def is_valid(c, d=[]):
 		flag = flag and (c in d)
 	return flag
 
+# calculate PMI (pointwise mutual info) to extract top-k words.
 def get_pmi(fname, dname, k):
 	f = open(fname, "r")
 	sur = {}
