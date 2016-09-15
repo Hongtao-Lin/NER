@@ -2,6 +2,7 @@
 *.model
 *.txt
 !dict/*.txt
+!requirements.txt
 *.out
 *.pyc
 *.save
