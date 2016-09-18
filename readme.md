@@ -1,4 +1,4 @@
-# NER - Algorithm
+# NER
 
 ## Overview
 
@@ -8,14 +8,13 @@ We use MSRA `06 as the dataset, which is also the official dataset for SIGHAN 06
 
 ## Architecture
 
-data/: All training/testing data.
-dict/: All external resources.
-model/: Save all valid models.
-CRF/: CRF++ source code and templates.
-demo/: NER web system.
-exec.sh: bash script for CRF running.
-colleval.pl: official evaluation code (in perl) for directly evaluating CRF++ output. 
-
+- data/: All training/testing data. 
+- dict/: All external resources.
+- model/: Save all valid models.
+- CRF/: CRF++ source code and templates.
+- demo/: NER web system.
+- exec.sh: bash script for CRF running.
+- colleval.pl: official evaluation code (in perl) for directly evaluating CRF++ output. 
 - util.py: All utility functions. e.g.: function to convert the original MSRA data to CRF++ format.
 - preprocessing.py: Convert OntoNotes5.0 format to CRF++ format.
 - rule.py: Constrcut rules to extract NEs (with the possible aid of external dict.)
@@ -49,7 +48,8 @@ The regex for constructing PER/LOC/ORG are borrowed from "Learning Pattern Rules
 
 ## NER Webapp
 
-Front: bootstrap, react, jq (use webpack for packing)
+Front: bootstrap, react, jquery (use webpack for packing)
+
 Back: flask
 
 Run:
@@ -73,7 +73,3 @@ $ webpack --watch
 ```
 
 To change the NER core function, consider the `view.py` and python codes in `src/*.py`. To change the webpage front-end or function, consider the  `static/js/`.
-
-## TODO:
-
-upload the transcript to evaluate results.
