@@ -18,6 +18,7 @@ We use MSRA `06 as the dataset, which is also the official dataset for SIGHAN 06
 - util.py: All utility functions. e.g.: function to convert the original MSRA data to CRF++ format.
 - preprocessing.py: Convert OntoNotes5.0 format to CRF++ format.
 - rule.py: Constrcut rules to extract NEs (with the possible aid of external dict.)
+- crf.py: Integrate rule and crf model to extract NE.
 
 ## CRF Baseline
 
