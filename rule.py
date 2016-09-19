@@ -199,7 +199,7 @@ def rough_match(sent):
 # (eg: "I am Hunter" -> ["o", "o", "o", "b_ns", "i_ns", ..., "e_ns"])
 # if convert=True: return a new sentence (symbolize) and the ne_map.
 # (eg: "I am Hunter" -> "I am \u1111", {5: (11, 0)} (5: "H", 11： "r", 0: type of PER.)
-def extract_ne(_sent, convert=False):
+def extract_ne(_sent, convert=0):
 	global ne_list, trie
 	cur_idx = 0
 	if _sent[cur_idx] == u"\ufeff":
@@ -211,16 +211,22 @@ def extract_ne(_sent, convert=False):
 	for i, (e,t) in ne_map.items():
 		print sent[i:i+e], t
 
-	if not convert:
+	if convert == 0:
 		pred_list = ["o"] * (len(sent)-4)
 		for i, (e, t) in ne_map.items():
 			ne_type = ne_list_rev2[t]
-			l = i+e-1
 			for j in range(i,i+e):
-				pred_list[j-2] = get_ne_type(j, l, ne_type)
+				ne_suf = ""
+				if j == i:
+					ne_suf = "b_"
+				elif j == i+e-1:
+					ne_suf = "e_"
+				else:
+					ne_suf = "i_"
+				pred_list[j-2] = ne_suf+ne_type
 		# print pred_list
 		return pred_list
-	else:
+	elif convert == 1:
 		new_sent = ''
 		new_map = {}
 		_i = 2
@@ -229,12 +235,28 @@ def extract_ne(_sent, convert=False):
 				print _sent[i:i+e],t
 			new_sent += _sent[_i:i] + ne_char[ne_list_rev[t]]
 			_i = i+e
-			new_map[len(new_sent)-1] = sent[i:_i].encode("utf8")
-		new_sent += _sent[_i:-2]
-
+			new_map[len(new_sent)-1] = _sent[i:_i].encode("utf8")
+		new_sent += _sent[_i:]
+		new_sent = new_sent[:-2]
 		# for i in new_map:
 		# 	print i, new_map[i]
 		return new_sent, new_map
+	else:
+		segment, formatted = [], []
+		_i = 2
+		for i, (e, t) in sorted(ne_map.items()):
+			if debug:
+				print _sent[i:i+e],t
+			if _i != i:
+				segment.append(_sent[_i:i])
+				formatted.append("o")
+			segment.append(_sent[i:i+e])
+			formatted.append(ne_list_rev[t])	
+			_i = i+e
+			# new_map[len(new_sent)-1] = sent[i:_i].encode("utf8")
+		segment.append(_sent[_i:-2])
+		formatted.append("o")
+		return {"segment": segment, "formatted": formatted}
 
 def load_ne_from_file(fname, sname, tag):
 	if os.path.exists(sname):

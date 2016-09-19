@@ -20,6 +20,14 @@ We use MSRA `06 as the dataset, which is also the official dataset for SIGHAN 06
 - rule.py: Constrcut rules to extract NEs (with the possible aid of external dict.)
 - crf.py: Integrate rule and crf model to extract NE.
 
+## Installation
+
+CRF++ can be downloaded from [here](https://taku910.github.io/crfpp/#download) (using latest version). Also, we invoke CRF++ in python, this package can be installed following the isntruction within CRF++ source code (there's a `python/` directory).
+
+To install CRF++ and python package without sudo permission, follow the instruction [here](http://alikewmk.me/tips/2015/08/06/how-to-install-crf-on-server-without-sudo-permisson/).
+
+
+
 ## CRF Baseline
 
 The CRF template are borrowed from "Using Non-Local Features to Improve Named Entity Recognition Recall" in the 06'SIGHAN competition. 

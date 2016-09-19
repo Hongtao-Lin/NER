@@ -11,9 +11,7 @@
 env/
 ontonotes-release-5.0/
 CRF/CRF++-0.58
-CRF/bin
-CRF/include
-CRF/lib
+CRF/CRF++
 demo/app/static/js/node_modules/
 demo/app/CRF++-0.58/
 demo/app/crfsuite-0.12/

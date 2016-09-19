@@ -172,7 +172,7 @@ def crf_tagger(sent):
 	dict1 = extract_ne(sent, convert=2)
 	# for i in ne_map:
 	# 	print i, ne_map[i]
-	print dict1["segment"]
+	# print dict1["segment"]
 	segment, formatted = [], []
 	for (f0, seg) in zip(dict1["formatted"], dict1["segment"]):
 		if f0 == "o":
@@ -206,4 +206,4 @@ def test_speed(fname):
 
 if __name__ == '__main__':
 	# test_speed("data/testright.txt")
-	crf_tagger(u",")
+	crf_tagger(u",习近平爱我")
