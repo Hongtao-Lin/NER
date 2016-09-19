@@ -1,6 +1,7 @@
 *.tar.gz
 *.model
 *.txt
+*.dat
 !dict/*.txt
 !requirements.txt
 *.out
